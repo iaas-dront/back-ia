@@ -5,24 +5,44 @@ const client = new OpenAI({
 });
 
 export async function generateSummary(store) {
-  const participants = [...store.participants.values()]
-    .map(p => `- ${p.username}`)
-    .join("\n") || "No se registraron participantes.";
+  // ─────────────────────────────
+  // PARTICIPANTES
+  // ─────────────────────────────
+  const participants =
+    [...store.participants.values()]
+      .map(p => `- ${p.username}`)
+      .join("\n") || "No se registraron participantes.";
 
-  const chat = store.messages
-    .map(m => `${m.username}: ${m.message}`)
-    .join("\n") || "No hubo mensajes en el chat.";
+  // ─────────────────────────────
+  // CHAT
+  // ─────────────────────────────
+  const chat =
+    store.messages.length > 0
+      ? store.messages.map(m => `${m.username}: ${m.message}`).join("\n")
+      : "No hubo mensajes en el chat.";
 
-  const voice = store.transcripts
-    .map(t => `${t.username}: ${t.text}`)
-    .join("\n") || "No hubo intervenciones por voz.";
+  // ─────────────────────────────
+  // VOZ
+  // ─────────────────────────────
+  const voice =
+    store.transcripts.length > 0
+      ? store.transcripts.map(t => `${t.username}: ${t.text}`).join("\n")
+      : "No hubo intervenciones por voz.";
 
-  const tasks = store.tasks
-    .map(t => `${t.username}: ${t.task}`)
-    .join("\n") || "No se detectaron tareas.";
+  // ─────────────────────────────
+  // TAREAS (CLAVE ANTI-INVENCIÓN)
+  // ─────────────────────────────
+  const tasks =
+    store.tasks.length > 0
+      ? store.tasks.map(t => `${t.username}: ${t.task}`).join("\n")
+      : "NO_HAY_TAREAS";
 
+  // ─────────────────────────────
+  // PROMPT FINAL
+  // ─────────────────────────────
   const prompt = `
-Eres un asistente que redacta actas de reuniones de forma clara, sencilla y natural.
+Eres un asistente que redacta actas reales de reuniones.
+Tu objetivo es ser claro, directo y NO inventar información.
 
 Información de la reunión:
 
@@ -38,29 +58,34 @@ ${voice}
 Tareas detectadas:
 ${tasks}
 
-INSTRUCCIONES:
-- Usa un lenguaje simple y directo.
-- No inventes información.
-- No agregues tareas que no estén explícitamente mencionadas.
-- No uses frases genéricas como “se discutieron diversos temas”.
+REGLAS OBLIGATORIAS:
+- Usa lenguaje simple y natural.
+- NO inventes tareas, responsables ni fechas.
+- NO agregues tareas genéricas.
+- NO uses textos como "[Nombre del responsable]" o "[Especificar fecha]".
+- Si "Tareas detectadas" es exactamente "NO_HAY_TAREAS",
+  escribe exactamente:
+  "No se detectaron tareas claras durante la reunión."
 
 RESPONDE ÚNICAMENTE CON ESTE FORMATO:
 
 ### 🧾 Resumen de la reunión
-Explica brevemente de qué se habló y qué decisiones se mencionaron.
+Describe brevemente de qué se habló.
 
 ### 💬 Participaciones
-Indica quién habló y qué dijo de forma resumida.
+Menciona quién habló y qué dijo de forma resumida.
 
 ### ✅ Tareas y compromisos
-- Si hay tareas, enuméralas con su responsable.
-- Si NO hay tareas, escribe exactamente:
-"No se detectaron tareas claras durante la reunión."
+(Lista real o mensaje de no tareas)
 `;
 
+  // ─────────────────────────────
+  // LLAMADA A OPENAI
+  // ─────────────────────────────
   const response = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [{ role: "user", content: prompt }],
+    temperature: 0.2, // 🔒 menos creatividad = menos inventos
   });
 
   return response.choices[0].message.content;
