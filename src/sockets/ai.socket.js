@@ -7,48 +7,56 @@ export function registerAiSocket(io) {
   io.on("connection", (socket) => {
     console.log("🤖 AI client connected:", socket.id);
 
-    // Usuario se une a la reunión
+    // Usuario se une
     socket.on("ai:join", ({ username, email }) => {
       meetingStore.participants.set(socket.id, { username, email });
       console.log(`👤 ${username} joined the meeting`);
     });
 
-    // Mensajes de chat
+    // Chat
     socket.on("ai:chat", ({ username, message }) => {
       meetingStore.messages.push({ username, message });
     });
 
-    // Texto transcrito desde voz
+    // Voz → texto
     socket.on("ai:voice-text", ({ username, text }) => {
       meetingStore.transcripts.push({ username, text });
       detectTasks({ username, text }, meetingStore);
     });
 
-    // Finalizar reunión → generar resumen
+    // Finalizar reunión
     socket.on("ai:end-meeting", async () => {
       try {
+        if (meetingStore.ended) return;
+        meetingStore.ended = true;
+
         const summary = await generateSummary(meetingStore);
 
-        // 📧 Envío de resumen (mock)
+        // 📧 Enviar email
         for (const user of meetingStore.participants.values()) {
-          await sendSummaryEmail(user.email, summary);
+          if (user.email) {
+            await sendSummaryEmail(user.email, summary);
+          }
         }
 
-        // Enviar resumen al frontend
-        socket.emit("ai:summary", summary);
+        // 📤 Enviar resumen a TODOS
+        io.emit("ai:summary", summary);
 
-        // 🔥 Limpiar estado para la siguiente reunión
+        // 🧹 Reset total
         meetingStore.messages = [];
         meetingStore.transcripts = [];
         meetingStore.tasks = [];
+        meetingStore.participants.clear();
+        meetingStore.ended = false;
 
         console.log("✅ Meeting summary generated and sent");
       } catch (error) {
         console.error("❌ Error generating summary:", error);
+        meetingStore.ended = false;
       }
     });
 
-    // Usuario se desconecta
+    // Desconexión
     socket.on("disconnect", () => {
       meetingStore.participants.delete(socket.id);
       console.log("❌ Client disconnected:", socket.id);
