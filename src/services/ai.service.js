@@ -7,36 +7,55 @@ const client = new OpenAI({
 export async function generateSummary(store) {
   const participants = [...store.participants.values()]
     .map(p => `- ${p.username}`)
-    .join("\n");
+    .join("\n") || "No se registraron participantes.";
 
   const chat = store.messages
     .map(m => `${m.username}: ${m.message}`)
-    .join("\n");
+    .join("\n") || "No hubo mensajes en el chat.";
 
   const voice = store.transcripts
     .map(t => `${t.username}: ${t.text}`)
-    .join("\n");
+    .join("\n") || "No hubo intervenciones por voz.";
 
   const tasks = store.tasks
     .map(t => `${t.username}: ${t.task}`)
-    .join("\n");
+    .join("\n") || "No se detectaron tareas.";
 
   const prompt = `
+Eres un asistente que redacta actas de reuniones de forma clara, sencilla y natural.
+
+Información de la reunión:
+
 Participantes:
 ${participants}
 
-Chat:
+Mensajes del chat:
 ${chat}
 
-Voz:
+Transcripción de voz:
 ${voice}
 
 Tareas detectadas:
 ${tasks}
 
-Genera:
-1. Resumen general de la reunión
-2. Lista clara de tareas con responsables
+INSTRUCCIONES:
+- Usa un lenguaje simple y directo.
+- No inventes información.
+- No agregues tareas que no estén explícitamente mencionadas.
+- No uses frases genéricas como “se discutieron diversos temas”.
+
+RESPONDE ÚNICAMENTE CON ESTE FORMATO:
+
+### 🧾 Resumen de la reunión
+Explica brevemente de qué se habló y qué decisiones se mencionaron.
+
+### 💬 Participaciones
+Indica quién habló y qué dijo de forma resumida.
+
+### ✅ Tareas y compromisos
+- Si hay tareas, enuméralas con su responsable.
+- Si NO hay tareas, escribe exactamente:
+"No se detectaron tareas claras durante la reunión."
 `;
 
   const response = await client.chat.completions.create({
