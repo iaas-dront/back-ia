@@ -3,4 +3,5 @@ export const meetingStore = {
   messages: [],
   transcripts: [],
   tasks: [],
+  ended: false, // ⬅️ evita múltiples cierres
 };
